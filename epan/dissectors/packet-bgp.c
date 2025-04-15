@@ -653,6 +653,7 @@ static dissector_handle_t bgp_handle;
 #define PMSI_TUNNEL_BIDIR_PIM    5
 #define PMSI_TUNNEL_INGRESS      6
 #define PMSI_TUNNEL_MLDP_MP2MP   7
+#define PMSI_TUNNEL_BIER         11
 
 #define PMSI_MLDP_FEC_TYPE_RSVD         0
 #define PMSI_MLDP_FEC_TYPE_GEN_LSP      1
@@ -1253,6 +1254,7 @@ static const value_string pmsi_tunnel_type[] = {
     { PMSI_TUNNEL_BIDIR_PIM,      "BIDIR-PIM Tree" },
     { PMSI_TUNNEL_INGRESS,        "Ingress Replication" },
     { PMSI_TUNNEL_MLDP_MP2MP,     "mLDP MP2MP LSP" },
+    { PMSI_TUNNEL_BIER,           "BIER" },
     { 0, NULL }
 };
 
@@ -2260,6 +2262,9 @@ static int hf_bgp_pmsi_tunnel_pimssm_pmc_group = -1;
 static int hf_bgp_pmsi_tunnel_pimbidir_sender = -1;
 static int hf_bgp_pmsi_tunnel_pimbidir_pmc_group = -1;
 static int hf_bgp_pmsi_tunnel_ingress_rep_addr = -1;
+static int hf_bgp_pmsi_tunnel_bier_sub_domain_id = -1;
+static int hf_bgp_pmsi_tunnel_bier_bfr_id = -1;
+static int hf_bgp_pmsi_tunnel_bier_bfr_prefix = -1;
 
 /* RFC 7311 attribute */
 static int hf_bgp_aigp_type = -1;
@@ -8659,6 +8664,17 @@ dissect_bgp_update_pmsi_attr(packet_info *pinfo, proto_tree *parent_tree, tvbuff
             proto_item_append_text(tunnel_id_item, ": tunnel end point -> %s",
                                    tvb_ip_to_str(pinfo->pool, tvb, offset+5));
             break;
+        case PMSI_TUNNEL_BIER:
+             g_message("bier here");
+             proto_tree_add_item(tunnel_id_tree, hf_bgp_pmsi_tunnel_bier_sub_domain_id, tvb, offset+5, 1, ENC_BIG_ENDIAN);
+             proto_tree_add_item(tunnel_id_tree, hf_bgp_pmsi_tunnel_bier_bfr_id, tvb, offset+6, 2, ENC_BIG_ENDIAN);
+             proto_tree_add_item(tunnel_id_tree, hf_bgp_pmsi_tunnel_bier_bfr_prefix, tvb, offset+8, 16, ENC_NA);
+             proto_item_append_text(tunnel_id_item, ": Sub-domain-id: %u, BFR-ID: %u, BFR-prefix: %s",
+                 tvb_get_guint8(tvb,offset+5),
+                 tvb_get_ntohs(tvb, offset+6),
+                 tvb_ip6_to_str(pinfo->pool, tvb, offset+8));
+             break;
+
         default:
             expert_add_info_format(pinfo, pmsi_tunnel_type_item, &ei_bgp_attr_pmsi_tunnel_type,
                                             "Tunnel type %u wrong", tunnel_type);
@@ -9464,6 +9480,7 @@ dissect_bgp_path_attr(proto_tree *subtree, tvbuff_t *tvb, guint16 path_attr_len,
                                         encaps_tunnel_sublen - 1, ENC_ASCII);
                                 q += (encaps_tunnel_sublen - 1);
                                 break;
+
                             default:
                                 proto_tree_add_item(subtree6, hf_bgp_update_encaps_tunnel_subtlv_value, tvb, q, encaps_tunnel_sublen, ENC_NA);
                                 q += encaps_tunnel_sublen;
@@ -11128,6 +11145,18 @@ proto_register_bgp(void)
       { &hf_bgp_pmsi_tunnel_ingress_rep_addr,
         {"Tunnel type ingress replication IP end point", "bgp.update.path_attribute.pmsi.ingress_rep_ip", FT_IPv4, BASE_NONE,
         NULL, 0x0, NULL, HFILL}},
+
+        { &hf_bgp_pmsi_tunnel_bier_sub_domain_id,
+             {"Sub-domain-id", "bgp.update.path_attribute.pmsi.bier.sub_domain_id", FT_UINT8, BASE_DEC,
+             NULL, 0x0, NULL, HFILL}},
+         { &hf_bgp_pmsi_tunnel_bier_bfr_id,
+             {"BFR-id", "bgp.update.path_attribute.pmsi.bier.bfr_id", FT_UINT16, BASE_DEC,
+             NULL, 0x0, NULL, HFILL}},
+         { &hf_bgp_pmsi_tunnel_bier_bfr_prefix,
+             {"BFR-prefix IPv6", "bgp.update.path_attribute.pmsi.bier.bfr_prefix", FT_IPv6, BASE_NONE,
+              NULL, 0x0, NULL, HFILL}},
+
+
 
         /* https://tools.ietf.org/html/draft-rabadan-sajassi-bess-evpn-ipvpn-interworking-02 */
       { &hf_bgp_update_path_attribute_d_path,
